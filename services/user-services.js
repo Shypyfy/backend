@@ -1,12 +1,21 @@
+const bcrypt = require("bcryptjs");
 const User = require("../models/user-model");
 
 const createUser = async (data) => {
-    const newUser = new User(data);
+    const existing = await User.findOne({ username: data.username });
+    if (existing) throw new Error("Username already exists");
+
+    const hashedPassword = await bcrypt.hash(data.password, 10);
+    const newUser = new User({
+        ...data,
+        password: hashedPassword,
+    });
+
     return await newUser.save();
 };
 
 const getAllUsers = async () => {
-    return await User.find();
+    return await User.find().select("-password");
 };
 
 const getUserByUsername = async (username) => {
@@ -26,11 +35,19 @@ const updateUserWallet = async (username, walletData) => {
         { username },
         { wallet: walletData },
         { new: true }
-    );
+    ).select("-password");
 };
 
 const deleteUser = async (username) => {
     return await User.findOneAndDelete({ username });
+};
+
+const validateUserCredentials = async (username, password) => {
+    const user = await User.findOne({ username });
+    if (!user) return null;
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    return isMatch ? user : null;
 };
 
 module.exports = {
@@ -40,5 +57,6 @@ module.exports = {
     getUserByWalletAddress,
     getUserByNIC,
     updateUserWallet,
-    deleteUser
+    deleteUser,
+    validateUserCredentials,
 };
